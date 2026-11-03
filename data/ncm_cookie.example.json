@@ -1,0 +1,22 @@
+[
+  {
+    "userId": "343525065",
+    "nickname": "示例账号（扫码登录）",
+    "type": "qrcode",
+    "enable": true,
+    "cookie": {
+      "MUSIC_U": "example-music-u",
+      "__csrf": "example-csrf"
+    }
+  },
+  {
+    "userId": "123456789",
+    "nickname": "示例账号（验证码登录，已禁用）",
+    "type": "code",
+    "enable": false,
+    "cookie": {
+      "MUSIC_U": "example-music-u-2",
+      "__csrf": "example-csrf-2"
+    }
+  }
+]

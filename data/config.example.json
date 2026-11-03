@@ -1,0 +1,38 @@
+{
+  "api": "http://127.0.0.1:3000",
+  "sckey": "",
+  "user_sl_id": [
+    "1234567890",
+    "9876543210"
+  ],
+  "daily_target_base": 330,
+  "daily_target_jitter": 15,
+  "slots_per_day": 2,
+  "catch_up": false,
+  "run_ratio_min": 0.35,
+  "run_ratio_max": 0.65,
+  "min_songs_per_run": 100,
+  "max_songs_per_run": 240,
+  "scrobble_seconds": 70,
+  "scrobble_jitter_seconds": 8,
+  "sleep_range": [
+    30,
+    60
+  ],
+  "sleep_long_pause_prob": 0.12,
+  "sleep_long_pause_range": [
+    120,
+    300
+  ],
+  "slot_overlap_seconds": 0,
+  "max_run_minutes": 0,
+  "hard_exit_buffer_minutes": 10,
+  "qr_timeout": 180,
+  "qr_poll_interval": 1,
+  "code_timeout": 180,
+  "code_poll_interval": 1,
+  "max_workers": 0,
+  "request_timeout": 15,
+  "notify_timeout": 15,
+  "scrobble_path": "/scrobble/v1"
+}

@@ -1,0 +1,288 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>易盾滑块 · 最小实现</title>
+<style>
+  :root { color-scheme: light dark; --fg: #1b1b1f; --muted: #6b6b76; --line: #d9d9e0; --bg: #fbfbfd; --card: #fff; }
+  @media (prefers-color-scheme: dark) {
+    :root { --fg: #e8e8ee; --muted: #9a9aa8; --line: #34343d; --bg: #131317; --card: #1b1b21; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 32px 20px 64px; background: var(--bg); color: var(--fg);
+         font: 14px/1.6 -apple-system, "PingFang SC", "Microsoft YaHei", system-ui, sans-serif; }
+  main { max-width: 720px; margin: 0 auto; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  .sub { margin: 0 0 24px; color: var(--muted); font-size: 13px; }
+  code { font: 12px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; background: color-mix(in srgb, var(--fg) 8%, transparent);
+         padding: 1px 5px; border-radius: 4px; }
+  section { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 16px; margin-bottom: 14px; }
+  .row { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 12px; }
+  label { display: block; flex: 1 1 200px; font-size: 12px; color: var(--muted); }
+  input, select { width: 100%; margin-top: 4px; padding: 8px 10px; font-size: 13px; color: var(--fg);
+          background: var(--bg); border: 1px solid var(--line); border-radius: 7px; }
+  button { flex: 0 0 auto; padding: 8px 14px; font-size: 13px; color: #fff; background: #3b5bdb;
+           border: 0; border-radius: 7px; cursor: pointer; }
+  button.ghost { background: transparent; color: var(--muted); border: 1px solid var(--line); }
+  button:disabled { opacity: .5; cursor: default; }
+  #yidun-cap { margin: 4px 0 14px; min-height: 0; }
+  #yidun-cap:not(:empty) { padding: 4px; }
+  pre { margin: 0; padding: 12px; min-height: 96px; max-height: 260px; overflow: auto;
+        font: 12px/1.55 ui-monospace, SFMono-Regular, Menlo, monospace;
+        background: var(--card); border: 1px solid var(--line); border-radius: 10px; white-space: pre-wrap; word-break: break-all; }
+</style>
+</head>
+<body>
+<main>
+  <h1>易盾滑块 · 最小实现</h1>
+  <p class="sub">对应 api-enhanced#294 的 <code>yidun/yidun-slider_v1.js</code>；只做「-462 挑战 → validate」这一段。</p>
+
+  <section>
+    <label>api 地址（留空 = 同源，例如 http://127.0.0.1:3000）
+      <input id="api" placeholder="http://127.0.0.1:3000" autocomplete="off" />
+    </label>
+    <div class="row">
+      <label>接口模式
+        <select id="mode">
+          <option value="pr">易盾 /api/yidun/login（PR #294，服务端 jar + MUSIC_TU）</option>
+          <option value="plain">普通 /login/cellphone（无会话，只够验滑块）</option>
+        </select>
+      </label>
+    </div>
+    <div class="row">
+      <label>手机号<input id="phone" inputmode="numeric" autocomplete="off" /></label>
+      <label>密码<input id="password" type="password" autocomplete="off" /></label>
+    </div>
+    <div class="row">
+      <button id="btn-slide">① 只测滑块</button>
+      <button id="btn-login">② 密码登录（走 8821 → 滑块）</button>
+      <button id="btn-clear" class="ghost">清空日志</button>
+    </div>
+    <div class="row" id="stage2">
+      <label>短信验证码（可直接登录，也可收 8830 二阶段）<input id="sms" inputmode="numeric" autocomplete="off" /></label>
+      <button id="btn-send">① b 发送短信码</button>
+      <button id="btn-sms">③ 用短信码登录</button>
+    </div>
+    <p class="sub" style="margin:10px 0 0">短信登录：① b 发码 → 填码 → ③，全程不经过密码，也不会有 8830 二阶段；只有触发 8821 时才会拉滑块。</p>
+    <p class="sub" style="margin:12px 0 0">sid：<code id="sid">-</code> —— 易盾模式下整条链路共用这个会话，刷新页面即换设备。</p>
+  </section>
+
+  <div id="yidun-cap"></div>
+
+  <section>
+    <label>validate（= 登录接口的 sca）<input id="sca" readonly placeholder="滑块通过后自动填入" /></label>
+  </section>
+
+  <pre id="log"></pre>
+</main>
+
+<script type="module">
+import { destroySlide, mountSlide, VERIFY_TYPE } from './yidun-slider.js?v=3'
+
+const $ = (s) => document.querySelector(s)
+const logEl = $('#log')
+const say = (msg) => {
+  const t = new Date().toLocaleTimeString('zh-CN', { hour12: false })
+  logEl.textContent += `[${t}] ${msg}\n`
+  logEl.scrollTop = logEl.scrollHeight
+}
+const API_KEY = 'yidun-demo-api'
+const apiEl = $('#api')
+const DEFAULT_API =
+  location.port === '3000' ? '' : 'http://' + (location.hostname || '127.0.0.1') + ':3000'
+apiEl.value = localStorage.getItem(API_KEY) ?? DEFAULT_API
+apiEl.addEventListener('change', () => localStorage.setItem(API_KEY, apiEl.value.trim()))
+const api = () => apiEl.value.trim().replace(/\/$/, '')
+
+async function postForm(path, body) {
+  const resp = await fetch(api() + path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams(body),
+    credentials: 'include',
+  })
+  return parseMaybeJson(resp)
+}
+
+/* ---------------- 会话与两种接口模式 ---------------- */
+function newSid() {
+  return typeof crypto !== 'undefined' && crypto.randomUUID
+    ? crypto.randomUUID()
+    : 'sid-' + Date.now() + '-' + Math.random().toString(16).slice(2)
+}
+const SID = newSid()
+$('#sid').textContent = SID
+const isPr = () => $('#mode').value === 'pr'
+
+async function postJson(path, body) {
+  const resp = await fetch(api() + path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+    credentials: 'include',
+  })
+  return parseMaybeJson(resp)
+}
+
+/** 返回不是 JSON 时，八成是打到静态服务器上了（python http.server 对 POST 回 501 HTML） */
+async function parseMaybeJson(resp) {
+  const text = await resp.text()
+  try {
+    return JSON.parse(text)
+  } catch {
+    const hint = /Unsupported method|Error response/i.test(text)
+      ? `请求打到了 ${api() || location.origin} 这个静态服务器，不是 API。把「api 地址」改成 http://127.0.0.1:3000`
+      : text.slice(0, 160)
+    return { code: resp.status, msg: hint, __notJson: true }
+  }
+}
+
+/** 服务端会话状态：sca / 二阶段票据 / NMTID，能直观看出 jar 有没有连着 */
+async function prState() {
+  try {
+    const s = await parseMaybeJson(await fetch(api() + '/api/yidun/state?sid=' + encodeURIComponent(SID)))
+    if (s.__notJson) return say('  ' + s.msg)
+    say(
+      `  会话 sca=${s.sca.has ? s.sca.len : '无'} · 二阶段=${s.stage.has ? '等短信码' : '无'} · NMTID=${s.nmtid.len}${s.nmtid.real ? '(真)' : ''} · cookie ${s.cookieLen}B`,
+    )
+  } catch (e) {
+    say('  state 查询失败：' + e.message)
+  }
+}
+
+/** PR 模式：/api/yidun/login，sid 贯穿，cookie jar 与 MUSIC_TU 都在服务端 */
+async function prLogin(body) {
+  const r = await postJson('/api/yidun/login', { ...body, sid: SID })
+  say(`[yidun] code=${r.code}${r.kind ? ' kind=' + r.kind : ''}${r.msg ? ' ' + r.msg : ''}`)
+  if (r.loginCookie) say('  loginCookie: ' + r.loginCookie.slice(0, 70) + '…')
+  await prState()
+  return r
+}
+
+/** 普通模式：/login/cellphone，没有服务端会话，只够验滑块能不能过 */
+async function plainLogin(body) {
+  const r = await postForm('/login/cellphone', { countrycode: '86', ...body })
+  say(`[plain] code=${r.code}${r.msg ? ' ' + r.msg : ''}`)
+  return r
+}
+
+/** 挂滑块 → 拿 validate → 收起组件 */
+async function runSlider(challenge) {
+  say('挂载易盾滑块…')
+  const validate = await mountSlide(challenge || { verifyType: VERIFY_TYPE.SLIDER }, {
+    container: '#yidun-cap',
+    width: 320,
+    onReady: () => say('滑块已渲染，请拖动'),
+    onError: (e) => say('滑块出错：' + e.message),
+  })
+  $('#sca').value = validate
+  say(`滑块通过：validate 长度 ${validate.length}，已填入上面输入框`)
+  destroySlide()
+  return validate
+}
+
+$('#btn-slide').addEventListener('click', async () => {
+  try {
+    await runSlider({ verifyType: VERIFY_TYPE.SLIDER })
+    say('这一步不联网登录，只验证组件本身；validate 可直接当 sca 用')
+  } catch (e) {
+    say('失败：' + (e && e.message))
+  }
+})
+
+$('#btn-login').addEventListener('click', async () => {
+  const phone = $('#phone').value.trim()
+  const password = $('#password').value
+  if (!phone || !password) return say('先填手机号和密码')
+
+  const mode = isPr() ? '易盾 /api/yidun/login' : '普通 /login/cellphone'
+  say(`模式：${mode}　sid=${SID.slice(0, 8)}…`)
+
+  const send = isPr()
+    ? (b) => prLogin(b)
+    : (b) => plainLogin({ ...b, countrycode: '86' })
+  const base = { phone, password }
+  try {
+    let r = await send(base)
+
+    if (Number(r.code) === 8830) {
+      $('#stage2').hidden = false
+      say('→ 8830：服务端已存一次性 MUSIC_TU，填短信码后点 ③' + (isPr() ? '' : '（普通模式没有服务端会话，收不了尾）'))
+      return
+    }
+    if (Number(r.code) === 200) {
+      say('✅ 登录成功：' + String(r.loginCookie || r.cookie || '').slice(0, 90))
+      return
+    }
+    if (![8821, 8810].includes(Number(r.code))) {
+      say('原始响应：' + JSON.stringify(r).slice(0, 500))
+      return
+    }
+    if (Number(r.code) === 8810) {
+      say('⚠ 8810 = 环境级风控（出口 IP / 设备指纹历史 / 设备频繁切换），不是滑块没过')
+      say('  拖滑块多半还是 8810，连试只会加重。')
+    }
+
+    // 8821 响应里可能带 captchaId（本次就带了），必须用它初始化；verifyType 只是兜底
+    const raw = r.body || r.data || {}
+    const challenge = {
+      verifyType: raw.verifyType || VERIFY_TYPE.SLIDER,
+      captchaId: raw.captchaId,
+    }
+    if (raw.captchaId) say('服务端下发 captchaId=' + raw.captchaId + '（用它挂滑块，别用写死的）')
+    const validate = await runSlider(challenge)
+
+    r = await send({ ...base, sca: validate })
+    say('带 sca 重试的原始响应：' + JSON.stringify(r).slice(0, 600))
+    if (Number(r.code) === 200) say('✅ 登录成功：' + String(r.loginCookie || r.cookie || '').slice(0, 90))
+    if (Number(r.code) === 8830) {
+      $('#stage2').hidden = false
+      say('→ 8830：填短信码后点 ③（MUSIC_TU 在服务端，会话不能断）')
+    }
+    if (Number(r.code) === 8810) {
+      say('→ 仍是 8810：滑块和 sca 都没问题，卡在环境。别再连试，换扫码登录或先解封')
+    }
+  } catch (e) {
+    say('失败：' + (e && e.message))
+  }
+})
+
+/** 8830 之后：发短信验证码（易盾模式走 /api/yidun/send，同一个 sid 的 cookie jar） */
+$('#btn-send').addEventListener('click', async () => {
+  const phone = $('#phone').value.trim()
+  if (!phone) return say('先填手机号')
+  try {
+    if (isPr()) {
+      const r = await postJson('/api/yidun/send', { phone, sid: SID, ctcode: '86' })
+      say(`[yidun/send] code=${r.code} ${r.msg || ''}`)
+      await prState()
+    } else {
+      const r = await postForm('/captcha/sent', { phone, ctcode: '86' })
+      say(`[captcha/sent] code=${r.code} ${r.msg || ''}`)
+    }
+  } catch (e) {
+    say('发送失败：' + (e && e.message))
+  }
+})
+
+$('#btn-sms').addEventListener('click', async () => {
+  const phone = $('#phone').value.trim()
+  const captcha = $('#sms').value.trim()
+  if (!phone || !captcha) return say('先填手机号和短信码')
+  try {
+    // 易盾模式带 sid（服务端 jar）；普通模式就是文档里的 /login/cellphone?captcha=
+    const r = isPr() ? await prLogin({ phone, captcha }) : await plainLogin({ phone, captcha })
+    if (Number(r.code) === 200) say('✅ 登录成功：' + String(r.loginCookie || '').slice(0, 90))
+    else say('原始响应：' + JSON.stringify(r).slice(0, 500))
+  } catch (e) {
+    say('失败：' + (e && e.message))
+  }
+})
+
+$('#btn-clear').addEventListener('click', () => {
+  logEl.textContent = ''
+})
+</script>
+</body>
+</html>

@@ -1,0 +1,18 @@
+[project]
+name = "wy-checkin"
+version = "0.1.0"
+description = "网易云音乐自动听歌（青龙/本地） + 接口请求测试工具"
+requires-python = ">=3.9"
+dependencies = [
+    "requests>=2.28",
+]
+
+[project.optional-dependencies]
+# 可选：需要生成/打印二维码图片时安装（uv sync --extra qr）
+qr = [
+    "qrcode[pil]>=7.3",
+]
+
+[tool.uv]
+# 纯脚本项目：uv 只管理依赖，不构建/安装本项目自身
+package = false

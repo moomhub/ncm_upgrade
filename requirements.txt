@@ -1,0 +1,3 @@
+# 与 pyproject.toml 保持一致；青龙/裸机可直接 pip install -r requirements.txt
+# 需要二维码图片支持时额外安装：qrcode[pil]>=7.3
+requests>=2.28

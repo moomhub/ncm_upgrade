@@ -1,0 +1,23 @@
+# 运行数据目录（config / account / cookie / state、锁、二维码都在这里；模板除外）
+data/*
+!data/README.md
+!data/config.example.json
+!data/account.example.json
+!data/ncm_cookie.example.json
+!data/ncm_state.example.json
+
+# 旧版散落在项目根目录的数据文件（迁移到 data/ 后不再使用，保留忽略规则防误提交）
+config.json
+account.json
+account.json.tmp
+ncm_cookie.json
+ncm_state.json
+ncm_run.lock
+code.jpg
+
+__pycache__/
+*.pyc
+main.py.bak
+.venv/
+.pnpm-store
+uv.lock
